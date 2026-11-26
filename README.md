@@ -1,80 +1,75 @@
-# Custom Component Template
+# time-budget-hook-haystack
 
-A template repository for creating custom [Haystack](https://haystack.deepset.ai/) components and publishing them as standalone Python packages.
+A [Haystack](https://haystack.deepset.ai/) Agent hook that stops a run once it has been running for a set number of seconds.
 
-For more details, see the Haystack documentation on [creating custom components](https://docs.haystack.deepset.ai/docs/custom-components) and [creating custom document stores](https://docs.haystack.deepset.ai/docs/creating-custom-document-stores).
+`max_agent_steps` caps how many steps an Agent takes, and Haystack's `TokenBudgetHook` caps how many tokens it spends. Neither one limits how long a run takes, and that's usually the limit that matters when an Agent sits behind an API with a request timeout, or calls slow tools. `TimeBudgetHook` adds that limit.
 
-## How to use this template
+## Installation
 
-1. Click **[Use this template](https://github.com/deepset-ai/custom-component/generate)** to create a new repository.
-
-2. **Rename the package directory** from `src/haystack_integrations/components/example/` to match your integration. See [Namespace convention](#namespace-convention) below for the correct path.
-
-3. **Update `pyproject.toml`** — search for `TODO` comments and replace:
-   - `name`: your package name, following the `<technology>-haystack` convention (e.g. `opensearch-haystack`)
-   - `description`, `authors`, `keywords`, `project.urls`
-   - `dependencies`: add your integration-specific dependencies
-   - `tool.hatch.version.raw-options`: if you renamed directories, the version path is still derived from git tags so no change is needed here
-
-4. **Add your component code** in the renamed directory and export your classes from `__init__.py`.
-
-5. **Add tests** in `tests/` — see the skeleton in `tests/test_example.py`.
-
-6. **Search for all `TODO` comments** across the project and address them.
-
-Check out the [video walkthrough](https://www.youtube.com/watch?v=SWC0QecAMcI) for a step-by-step guide on how to use this template.
-
-## Namespace convention
-
-Haystack integrations use the `haystack_integrations` namespace package. The directory structure under `src/` determines the import path for your component.
-
-**Components** (converters, embedders, generators, rankers, etc.) use:
+```bash
+pip install time-budget-hook-haystack
 ```
-src/haystack_integrations/components/<type>/<name>/
-```
-Import path: `from haystack_integrations.components.<type>.<name> import MyComponent`
 
-Common component types: `converters`, `embedders`, `generators`, `rankers`, `retrievers`, `connectors`, `tools`, `websearch`
+Requires `haystack-ai>=3.2.0`.
 
-**Document stores** use a separate namespace:
+## Usage
+
+```python
+from haystack.components.agents import Agent
+from haystack.components.generators.chat import OpenAIChatGenerator
+
+from haystack_integrations.hooks.time_budget import TimeBudgetHook
+
+agent = Agent(
+    chat_generator=OpenAIChatGenerator(),  # needs OPENAI_API_KEY
+    tools=[web_search],
+    hooks={"before_llm": [TimeBudgetHook(max_seconds=60)]},
+)
+
+result = agent.run(messages=[...])
+result["exit_reason"]
+# >> "time_budget_exceeded" if the run took longer than 60 seconds
 ```
-src/haystack_integrations/document_stores/<name>/
+
+For a version that runs offline, with no API key, see [`examples/agent_with_time_budget.py`](examples/agent_with_time_budget.py).
+
+### Parameters
+
+| Parameter | Description |
+|---|---|
+| `max_seconds` | Maximum wall-clock time, in seconds, a run may take before it's stopped. Must be positive. |
+| `add_final_message` | If `True`, adds an assistant message saying the Agent stopped because the time budget was exceeded. Defaults to `False`. |
+
+## How it works
+
+- The hook runs at the `before_llm` hook point. The first time it sees a run, it starts that run's clock.
+- Before each later LLM call, it checks the elapsed time. Once the budget is used up, it sets the Agent's `stop_run` state key, and the run ends with `exit_reason == "time_budget_exceeded"` (also exported as `EXIT_REASON`).
+- The check happens between steps, so an LLM call or tool call that's already running is never cut off. A run can go over the budget by up to one step.
+- To also count time spent in your `before_run` hooks, register the same hook instance under `before_run` as well. The clock then starts there.
+- One hook instance can be shared by concurrent runs, sync or async. Each run gets its own clock.
+- The hook serializes with `Agent.to_dict()` / `Agent.from_dict()` like Haystack's built-in hooks.
+
+Combine it with other budgets as needed:
+
+```python
+from haystack.hooks.budget import TokenBudgetHook
+
+hooks = {"before_llm": [TimeBudgetHook(max_seconds=60), TokenBudgetHook(max_total_tokens=100_000)]}
 ```
-Import path: `from haystack_integrations.document_stores.<name> import MyDocumentStore`
 
 ## Development
 
-This project uses [Hatch](https://hatch.pypa.io/) for build and environment management.
+This project uses [Hatch](https://hatch.pypa.io/).
 
 ```bash
-# Install Hatch
-pip install hatch
-
-# Format and lint
-hatch run fmt        # auto-fix
-hatch run fmt-check  # check only
-
-# Run tests
-hatch run test:unit         # unit tests only
-hatch run test:integration  # integration tests only
-hatch run test:all          # all tests
-hatch run test:cov          # with coverage
+hatch run test:all   # run the tests
+hatch run fmt        # format and lint
 ```
 
-## Publishing to PyPI
+## Publishing
 
-This template includes a GitHub Actions workflow that publishes your package to PyPI when you push a version tag.
-
-1. **Add a `PYPI_API_TOKEN` secret** to your repository settings (Settings > Secrets and variables > Actions).
-
-2. **Create a version tag** and push it:
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-The release workflow will build and publish the package automatically.
+Pushing a `v*` tag (for example `v0.1.0`) runs `.github/workflows/release.yml`, which publishes to PyPI. It needs a `PYPI_API_TOKEN` repository secret.
 
 ## License
 
-`Apache-2.0` - See [LICENSE](LICENSE) for details.
+`Apache-2.0`. See [LICENSE](LICENSE).

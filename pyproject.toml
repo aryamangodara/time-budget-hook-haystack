@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026-present AUTHOR <your@email.com>
+# SPDX-FileCopyrightText: 2026-present Aryaman Godara
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -7,19 +7,21 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "example-haystack"  # TODO: Replace with your package name, e.g. "deepset-ai-haystack"
+name = "time-budget-hook-haystack"
 dynamic = ["version"]
-description = "A custom Haystack component"  # TODO: Replace with your description
+description = "Haystack Agent hook that stops a run once a wall-clock time budget is used up"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 keywords = [
     "haystack",
-    # TODO: Add relevant keywords for your integration
+    "agent",
+    "hook",
+    "budget",
+    "timeout",
 ]
 authors = [
-    # TODO: Replace with your name and email
-    { name = "AUTHOR", email = "your@email.com" },
+    { name = "Aryaman Godara" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -35,15 +37,14 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "haystack-ai",
-    # TODO: Add your integration-specific dependencies here
+    # 3.2.0 is the first release whose Agent honors the `stop_run` state key set by hooks.
+    "haystack-ai>=3.2.0",
 ]
 
 [project.urls]
-# TODO: Replace with your repository URL
-Documentation = "https://github.com/your-org/example-haystack#readme"
-Issues = "https://github.com/your-org/example-haystack/issues"
-Source = "https://github.com/your-org/example-haystack"
+Documentation = "https://github.com/aryamangodara/time-budget-hook-haystack#readme"
+Issues = "https://github.com/aryamangodara/time-budget-hook-haystack/issues"
+Source = "https://github.com/aryamangodara/time-budget-hook-haystack"
 
 [tool.hatch.version]
 source = "vcs"
